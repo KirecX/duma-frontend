@@ -1,5 +1,5 @@
 // ============================================================
-//  Фронтенд — РАБОЧАЯ ВЕРСИЯ БЕЗ PEERJS
+//  УПРОЩЁННЫЙ ФРОНТЕНД — ТОЛЬКО РЕГЛАМЕНТ И ГОЛОСОВАНИЕ
 // ============================================================
 
 const BACKEND_URL = 'https://duma-backend-production.up.railway.app';
@@ -11,16 +11,13 @@ let currentToken = null;
 let currentUser = null;
 let isAdmin = false;
 let hasVoted = false;
-let currentTime = 0;
 
 // ---------- DOM ЭЛЕМЕНТЫ ----------
 const userInfo = document.getElementById('user-info');
-const logoutBtn = document.getElementById('logout-btn');
 const adminPanel = document.getElementById('admin-panel');
 const deputyInfo = document.getElementById('deputy-info');
 const deputyNameDisplay = document.getElementById('deputy-name-display');
 const timerDisplay = document.getElementById('timer-display');
-const timerDisplayDeputy = document.getElementById('timer-display-deputy');
 const voteStatus = document.getElementById('vote-status');
 const resultsDisplay = document.getElementById('results-display');
 const breakStatus = document.getElementById('break-status');
@@ -28,10 +25,6 @@ const deputiesList = document.getElementById('deputies-list');
 const speakerSelect = document.getElementById('speaker-select');
 const customTime = document.getElementById('custom-time');
 const deputyNameInput = document.getElementById('deputy-name');
-const videoContainer = document.getElementById('video-container');
-const centerVideo = document.getElementById('center-video');
-const centerWrapper = document.getElementById('center-video-wrapper');
-const centerLabel = document.getElementById('center-label');
 
 // ============================================================
 //  ТОКЕН
@@ -49,23 +42,10 @@ function clearToken() {
     localStorage.removeItem('duma_token_' + window.location.host);
 }
 
-function clearTokenAndReload() {
-    clearToken();
-    if (socket) { socket.disconnect(); socket = null; }
-    location.reload();
-}
-
 function logout() {
-    if (confirm('Выйти из аккаунта?')) {
-        clearTokenAndReload();
-    }
-}
-
-function showLogoutButton() {
-    if (logoutBtn) {
-        logoutBtn.style.display = 'inline-block';
-        logoutBtn.onclick = logout;
-    }
+    clearToken();
+    if (socket) socket.disconnect();
+    location.reload();
 }
 
 // ============================================================
@@ -89,7 +69,6 @@ function showLoginForm() {
         userInfo.textContent = 'Председатель';
         adminPanel.style.display = 'block';
         deputyInfo.style.display = 'none';
-        showLogoutButton();
         fetchDeputies();
         initSocket('admin');
         return;
@@ -104,10 +83,7 @@ function attemptLogin(token) {
     
     fetch(`${BACKEND_URL}/api/session-state`, {
         method: 'GET',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': token
-        }
+        headers: { 'Authorization': token }
     })
     .then(res => {
         if (!res.ok) {
@@ -115,7 +91,7 @@ function attemptLogin(token) {
                 clearToken();
                 throw new Error('Неверный токен');
             }
-            throw new Error('Ошибка сервера: ' + res.status);
+            throw new Error('Ошибка сервера');
         }
         return res.json();
     })
@@ -134,7 +110,6 @@ function attemptLogin(token) {
         
         userInfo.textContent = isAdmin ? 'Председатель' : `Депутат: ${data.user.name}`;
         deputyNameDisplay.textContent = data.user.name;
-        showLogoutButton();
         
         if (isAdmin) {
             adminPanel.style.display = 'block';
@@ -151,7 +126,6 @@ function attemptLogin(token) {
         }
     })
     .catch(err => {
-        console.error('Ошибка входа:', err);
         alert('Ошибка: ' + err.message);
         clearToken();
         showLoginForm();
@@ -163,8 +137,7 @@ function attemptLogin(token) {
 // ============================================================
 
 function restoreState(state) {
-    currentTime = state.time_remaining || 0;
-    updateTimerDisplay(currentTime);
+    timerDisplay.textContent = `⏱️ ${state.time_remaining || 0}`;
     
     if (state.is_break) {
         breakStatus.textContent = '⏸️ ПЕРЕРЫВ';
@@ -185,14 +158,8 @@ function restoreState(state) {
     }
 }
 
-function updateTimerDisplay(time) {
-    currentTime = time;
-    if (timerDisplay) timerDisplay.textContent = `⏱️ ${time}`;
-    if (timerDisplayDeputy) timerDisplayDeputy.textContent = `⏱️ ${time}`;
-}
-
 // ============================================================
-//  ЗАГРУЗКА СПИСКА ДЕПУТАТОВ
+//  ДЕПУТАТЫ
 // ============================================================
 
 function fetchDeputies() {
@@ -286,9 +253,6 @@ function hideVoteButtons() {
 }
 
 function sendVote(vote) {
-    const container = document.getElementById('vote-buttons');
-    if (container) container.innerHTML = '<p style="color:#ffd93d;">⏳ Отправка...</p>';
-    
     fetch(`${BACKEND_URL}/api/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -306,7 +270,6 @@ function sendVote(vote) {
         }
     })
     .catch(err => {
-        console.error('Ошибка голосования:', err);
         alert('❌ Ошибка отправки голоса');
         showVoteButtons();
     });
@@ -321,55 +284,35 @@ function initSocket(token) {
     
     socket = io(BACKEND_URL, {
         transports: ['websocket', 'polling'],
-        query: {
-            token: token,
-            authorization: token
-        }
+        query: { token: token }
     });
     
     socket.on('connect', () => {
         console.log('✅ Сокет подключен');
-        socket.emit('join', { 
-            token: token,
-            authorization: token,
-            peerId: null
-        });
+        socket.emit('join', { token: token, peerId: null });
     });
     
     socket.on('connect_error', (error) => {
-        console.error('❌ Ошибка подключения сокета:', error);
+        console.error('❌ Ошибка сокета:', error);
     });
     
     socket.on('session-state', (data) => {
-        console.log('📥 Получено состояние сессии');
-        if (data.user) {
-            currentUser = data.user;
-        }
-        if (data.state) {
-            restoreState(data.state);
-        }
+        if (data.state) restoreState(data.state);
     });
     
     socket.on('timer-update', (data) => {
-        updateTimerDisplay(data.time);
+        timerDisplay.textContent = `⏱️ ${data.time}`;
     });
     
     socket.on('floor-changed', (data) => {
-        console.log('🎤 Смена выступающего:', data);
         if (data.speakerId) {
-            updateTimerDisplay(data.time || 0);
-        } else {
-            centerWrapper.style.display = 'none';
+            timerDisplay.textContent = `⏱️ ${data.time || 0}`;
         }
     });
     
     socket.on('voting-started', () => {
         voteStatus.textContent = '🗳️ Идёт голосование!';
-        if (!isAdmin && !hasVoted) {
-            showVoteButtons();
-        } else if (hasVoted) {
-            voteStatus.textContent = '🗳️ Вы уже проголосовали';
-        }
+        if (!isAdmin && !hasVoted) showVoteButtons();
     });
     
     socket.on('voting-closed', () => {
@@ -377,21 +320,12 @@ function initSocket(token) {
         hideVoteButtons();
     });
     
-    socket.on('vote-count', (data) => {
-        if (voteStatus) {
-            voteStatus.textContent = `🗳️ Проголосовало: ${data.total}`;
-        }
-    });
-    
     socket.on('results', (data) => {
-        if (resultsDisplay) {
-            resultsDisplay.innerHTML = `
-                <strong>ЗА</strong> — ${data.for || 0} &nbsp;|&nbsp;
-                <strong>ПРОТИВ</strong> — ${data.against || 0} &nbsp;|&nbsp;
-                <strong>ВОЗДЕРЖАЛСЯ</strong> — ${data.abstain || 0}
-            `;
-        }
-        voteStatus.textContent = '📊 Результаты оглашены!';
+        resultsDisplay.innerHTML = `
+            <strong>ЗА</strong> — ${data.for || 0} &nbsp;|&nbsp;
+            <strong>ПРОТИВ</strong> — ${data.against || 0} &nbsp;|&nbsp;
+            <strong>ВОЗДЕРЖАЛСЯ</strong> — ${data.abstain || 0}
+        `;
     });
     
     socket.on('break-started', () => {
@@ -403,26 +337,25 @@ function initSocket(token) {
     });
     
     socket.on('deputies-updated', (deputies) => {
-        if (isAdmin && deputiesList) {
+        if (isAdmin) {
             renderDeputies(deputies);
             populateSpeakerSelect(deputies);
         }
     });
     
     socket.on('clear-all', () => {
-        if (deputiesList) deputiesList.innerHTML = '';
-        if (speakerSelect) speakerSelect.innerHTML = '';
-        if (resultsDisplay) resultsDisplay.innerHTML = '';
-        updateTimerDisplay(0);
-        if (voteStatus) voteStatus.textContent = '';
-        if (breakStatus) breakStatus.textContent = '';
+        deputiesList.innerHTML = '';
+        speakerSelect.innerHTML = '';
+        resultsDisplay.innerHTML = '';
+        timerDisplay.textContent = '⏱️ 0';
+        voteStatus.textContent = '';
+        breakStatus.textContent = '';
         hideVoteButtons();
         hasVoted = false;
         if (isAdmin) fetchDeputies();
     });
     
     socket.on('error', (msg) => {
-        console.error('Ошибка сокета:', msg);
         alert('Ошибка: ' + msg);
     });
 }
@@ -448,7 +381,7 @@ function adminAction(action, payload = {}) {
 }
 
 // ============================================================
-//  ИНИЦИАЛИЗАЦИЯ
+//  ЗАПУСК
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -459,112 +392,74 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoginForm();
     }
     
-    // КНОПКИ
-    const createBtn = document.getElementById('create-deputy-btn');
-    if (createBtn) {
-        createBtn.onclick = () => {
-            const name = deputyNameInput ? deputyNameInput.value.trim() : '';
-            if (!name) return alert('Введите имя депутата');
-            fetch(`${BACKEND_URL}/api/create-deputy`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, adminPassword: ADMIN_PASSWORD })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    if (deputyNameInput) deputyNameInput.value = '';
-                    fetchDeputies();
-                } else {
-                    alert(data.message || 'Ошибка создания');
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Ошибка: ' + err.message);
-            });
-        };
-    }
+    // ---------- КНОПКИ ----------
     
-    const giveBtn = document.getElementById('give-floor-btn');
-    if (giveBtn) {
-        giveBtn.onclick = () => {
-            const userId = speakerSelect ? speakerSelect.value : '';
-            if (!userId) return alert('Выберите депутата');
-            let seconds = parseInt(customTime ? customTime.value : 60);
-            if (isNaN(seconds) || seconds <= 0) seconds = 60;
-            adminAction('give-floor', { userId, seconds });
-        };
-    }
-    
-    const revokeBtn = document.getElementById('revoke-floor-btn');
-    if (revokeBtn) {
-        revokeBtn.onclick = () => {
-            adminAction('revoke-floor');
-        };
-    }
-    
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.onclick = () => {
-            if (customTime) customTime.value = btn.dataset.seconds;
-        };
+    document.getElementById('create-deputy-btn')?.addEventListener('click', () => {
+        const name = deputyNameInput.value.trim();
+        if (!name) return alert('Введите имя');
+        fetch(`${BACKEND_URL}/api/create-deputy`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, adminPassword: ADMIN_PASSWORD })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                deputyNameInput.value = '';
+                fetchDeputies();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(console.error);
     });
     
-    const startVoteBtn = document.getElementById('start-voting-btn');
-    if (startVoteBtn) {
-        startVoteBtn.onclick = () => {
-            adminAction('start-voting');
-        };
-    }
+    document.getElementById('give-floor-btn')?.addEventListener('click', () => {
+        const userId = speakerSelect.value;
+        if (!userId) return alert('Выберите депутата');
+        let seconds = parseInt(customTime.value) || 60;
+        adminAction('give-floor', { userId, seconds });
+    });
     
-    const closeVoteBtn = document.getElementById('close-voting-btn');
-    if (closeVoteBtn) {
-        closeVoteBtn.onclick = () => {
-            adminAction('close-voting');
-        };
-    }
+    document.getElementById('revoke-floor-btn')?.addEventListener('click', () => {
+        adminAction('revoke-floor');
+    });
     
-    const announceBtn = document.getElementById('announce-results-btn');
-    if (announceBtn) {
-        announceBtn.onclick = () => {
-            adminAction('announce-results');
-        };
-    }
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            customTime.value = btn.dataset.seconds;
+        });
+    });
     
-    const breakBtn = document.getElementById('break-btn');
-    if (breakBtn) {
-        breakBtn.onclick = () => {
-            adminAction('set-break');
-        };
-    }
+    document.getElementById('start-voting-btn')?.addEventListener('click', () => {
+        adminAction('start-voting');
+    });
     
-    const endBreakBtn = document.getElementById('end-break-btn');
-    if (endBreakBtn) {
-        endBreakBtn.onclick = () => {
-            adminAction('end-break');
-        };
-    }
+    document.getElementById('close-voting-btn')?.addEventListener('click', () => {
+        adminAction('close-voting');
+    });
     
-    const clearBtn = document.getElementById('clear-all-btn');
-    if (clearBtn) {
-        clearBtn.onclick = () => {
-            if (confirm('Вы уверены, что хотите очистить всё?')) {
-                adminAction('clear-all');
-            }
-        };
-    }
+    document.getElementById('announce-results-btn')?.addEventListener('click', () => {
+        adminAction('announce-results');
+    });
     
-    console.log('🏛️ Симулятор Госдумы загружен');
+    document.getElementById('break-btn')?.addEventListener('click', () => {
+        adminAction('set-break');
+    });
+    
+    document.getElementById('end-break-btn')?.addEventListener('click', () => {
+        adminAction('end-break');
+    });
+    
+    document.getElementById('clear-all-btn')?.addEventListener('click', () => {
+        if (confirm('Вы уверены?')) {
+            adminAction('clear-all');
+        }
+    });
 });
 
 // ============================================================
-//  ДЕБАГ
+//  ВЫХОД
 // ============================================================
 
-window.showState = function() {
-    console.log('=== СОСТОЯНИЕ СИСТЕМЫ ===');
-    console.log('Пользователь:', currentUser);
-    console.log('Админ:', isAdmin);
-    console.log('Токен:', getToken());
-    console.log('Сокет:', socket ? 'подключен' : 'отключен');
-};
+document.getElementById('logout-btn')?.addEventListener('click', logout);
