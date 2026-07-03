@@ -1,5 +1,5 @@
 // ============================================================
-//  УПРОЩЁННЫЙ ФРОНТЕНД — ТОЛЬКО РЕГЛАМЕНТ И ГОЛОСОВАНИЕ
+//  ФИНАЛЬНЫЙ ФРОНТЕНД — ТОКЕН ТОЛЬКО В join
 // ============================================================
 
 const BACKEND_URL = 'https://duma-backend-production.up.railway.app';
@@ -276,20 +276,23 @@ function sendVote(vote) {
 }
 
 // ============================================================
-//  СОКЕТ
+//  СОКЕТ — ИСПРАВЛЕННАЯ ВЕРСИЯ!
 // ============================================================
 
 function initSocket(token) {
     if (socket) { socket.disconnect(); socket = null; }
     
     socket = io(BACKEND_URL, {
-        transports: ['websocket', 'polling'],
-        query: { token: token }
+        transports: ['websocket', 'polling']
     });
     
     socket.on('connect', () => {
         console.log('✅ Сокет подключен');
-        socket.emit('join', { token: token, peerId: null });
+        // ТОКЕН ПЕРЕДАЁМ ТОЛЬКО В СОБЫТИИ join
+        socket.emit('join', { 
+            token: token,
+            peerId: null
+        });
     });
     
     socket.on('connect_error', (error) => {
