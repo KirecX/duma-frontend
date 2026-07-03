@@ -1,5 +1,5 @@
 // ============================================================
-//  Фронтенд для симулятора "Государственная Дума" — ИСПРАВЛЕННАЯ ВЕРСИЯ
+//  Фронтенд — РАБОЧАЯ ВЕРСИЯ БЕЗ PEERJS
 // ============================================================
 
 const BACKEND_URL = 'https://duma-backend-production.up.railway.app';
@@ -7,19 +7,11 @@ const ADMIN_PASSWORD = 'duma2026';
 
 // ---------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ----------
 let socket = null;
-let peer = null;
-let myPeerId = null;
 let currentToken = null;
 let currentUser = null;
 let isAdmin = false;
-let myStream = null;
-let isMuted = true;
-let currentSpeakerId = null;
-let currentTime = 0;
-let timerInterval = null;
-let peerConnections = {};
-let activePeers = [];
 let hasVoted = false;
+let currentTime = 0;
 
 // ---------- DOM ЭЛЕМЕНТЫ ----------
 const userInfo = document.getElementById('user-info');
@@ -60,11 +52,6 @@ function clearToken() {
 function clearTokenAndReload() {
     clearToken();
     if (socket) { socket.disconnect(); socket = null; }
-    if (peer) { peer.destroy(); peer = null; }
-    if (myStream) {
-        myStream.getTracks().forEach(track => track.stop());
-        myStream = null;
-    }
     location.reload();
 }
 
@@ -105,7 +92,6 @@ function showLoginForm() {
         showLogoutButton();
         fetchDeputies();
         initSocket('admin');
-        initPeer('admin');
         return;
     }
     
@@ -157,10 +143,8 @@ function attemptLogin(token) {
         } else {
             adminPanel.style.display = 'none';
             deputyInfo.style.display = 'block';
-            setTimeout(startLocalStream, 1000);
         }
         initSocket(token);
-        initPeer(token);
         
         if (data.state) {
             restoreState(data.state);
@@ -172,36 +156,6 @@ function attemptLogin(token) {
         clearToken();
         showLoginForm();
     });
-}
-
-// ============================================================
-//  PEERJS
-// ============================================================
-
-function initPeer(token) {
-    // Временно отключаем PeerJS, чтобы не мешал
-    console.log('⏸️ PeerJS временно отключен');
-    myPeerId = 'disabled_' + Date.now();
-    return;
-    
-    // Оригинальный код PeerJS (закомментирован)
-    /*
-    const uniqueId = token === 'admin' 
-        ? 'admin_' + Date.now()
-        : 'deputy_' + token.replace(/-/g, '');
-    myPeerId = uniqueId;
-    peer = new Peer(uniqueId, {
-        debug: 2,
-        secure: true,
-        config: { 'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }] }
-    });
-    peer.on('open', (id) => {
-        console.log('✅ Peer открыт, id:', id);
-        if (socket && socket.connected) {
-            socket.emit('join', { token, peerId: id });
-        }
-    });
-    */
 }
 
 // ============================================================
@@ -359,7 +313,7 @@ function sendVote(vote) {
 }
 
 // ============================================================
-//  СОКЕТ — ИСПРАВЛЕННАЯ ВЕРСИЯ!
+//  СОКЕТ
 // ============================================================
 
 function initSocket(token) {
@@ -375,7 +329,6 @@ function initSocket(token) {
     
     socket.on('connect', () => {
         console.log('✅ Сокет подключен');
-        // Отправляем join с токеном
         socket.emit('join', { 
             token: token,
             authorization: token,
@@ -388,7 +341,7 @@ function initSocket(token) {
     });
     
     socket.on('session-state', (data) => {
-        console.log('📥 Получено состояние сессии:', data);
+        console.log('📥 Получено состояние сессии');
         if (data.user) {
             currentUser = data.user;
         }
@@ -404,10 +357,8 @@ function initSocket(token) {
     socket.on('floor-changed', (data) => {
         console.log('🎤 Смена выступающего:', data);
         if (data.speakerId) {
-            currentSpeakerId = data.speakerId;
             updateTimerDisplay(data.time || 0);
         } else {
-            currentSpeakerId = null;
             centerWrapper.style.display = 'none';
         }
     });
@@ -470,10 +421,10 @@ function initSocket(token) {
         if (isAdmin) fetchDeputies();
     });
     
-    // socket.on('error', (msg) => {
-        // console.error('Ошибка сокета:', msg);
-        // alert('Ошибка: ' + msg);
-    // });
+    socket.on('error', (msg) => {
+        console.error('Ошибка сокета:', msg);
+        alert('Ошибка: ' + msg);
+    });
 }
 
 // ============================================================
