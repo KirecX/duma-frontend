@@ -1,5 +1,5 @@
 // ============================================================
-//  ФИНАЛЬНЫЙ ФРОНТЕНД — ТОКЕН ТОЛЬКО В join
+//  УПРОЩЁННЫЙ ФРОНТЕНД — ТОЛЬКО РЕГЛАМЕНТ И ГОЛОСОВАНИЕ
 // ============================================================
 
 const BACKEND_URL = 'https://duma-backend-production.up.railway.app';
@@ -12,34 +12,20 @@ let currentUser = null;
 let isAdmin = false;
 let hasVoted = false;
 
-// ---------- DOM ЭЛЕМЕНТЫ ----------
-const userInfo = document.getElementById('user-info');
-const adminPanel = document.getElementById('admin-panel');
-const deputyInfo = document.getElementById('deputy-info');
-const deputyNameDisplay = document.getElementById('deputy-name-display');
-const timerDisplay = document.getElementById('timer-display');
-const voteStatus = document.getElementById('vote-status');
-const resultsDisplay = document.getElementById('results-display');
-const breakStatus = document.getElementById('break-status');
-const deputiesList = document.getElementById('deputies-list');
-const speakerSelect = document.getElementById('speaker-select');
-const customTime = document.getElementById('custom-time');
-const deputyNameInput = document.getElementById('deputy-name');
-
 // ============================================================
 //  ТОКЕН
 // ============================================================
 
 function getToken() {
-    return localStorage.getItem('duma_token_' + window.location.host);
+    return localStorage.getItem('duma_token');
 }
 
 function saveToken(token) {
-    localStorage.setItem('duma_token_' + window.location.host, token);
+    localStorage.setItem('duma_token', token);
 }
 
 function clearToken() {
-    localStorage.removeItem('duma_token_' + window.location.host);
+    localStorage.removeItem('duma_token');
 }
 
 function logout() {
@@ -66,9 +52,9 @@ function showLoginForm() {
         isAdmin = true;
         currentToken = 'admin';
         currentUser = { name: 'Председатель', isAdmin: true };
-        userInfo.textContent = 'Председатель';
-        adminPanel.style.display = 'block';
-        deputyInfo.style.display = 'none';
+        document.getElementById('user-info').textContent = 'Председатель';
+        document.getElementById('admin-panel').style.display = 'block';
+        document.getElementById('deputy-info').style.display = 'none';
         fetchDeputies();
         initSocket('admin');
         return;
@@ -79,7 +65,7 @@ function showLoginForm() {
 }
 
 function attemptLogin(token) {
-    userInfo.textContent = 'Загрузка...';
+    document.getElementById('user-info').textContent = 'Загрузка...';
     
     fetch(`${BACKEND_URL}/api/session-state`, {
         method: 'GET',
@@ -108,16 +94,16 @@ function attemptLogin(token) {
         currentToken = token;
         hasVoted = data.voted || false;
         
-        userInfo.textContent = isAdmin ? 'Председатель' : `Депутат: ${data.user.name}`;
-        deputyNameDisplay.textContent = data.user.name;
+        document.getElementById('user-info').textContent = isAdmin ? 'Председатель' : `Депутат: ${data.user.name}`;
+        document.getElementById('deputy-name-display').textContent = data.user.name;
         
         if (isAdmin) {
-            adminPanel.style.display = 'block';
-            deputyInfo.style.display = 'none';
+            document.getElementById('admin-panel').style.display = 'block';
+            document.getElementById('deputy-info').style.display = 'none';
             fetchDeputies();
         } else {
-            adminPanel.style.display = 'none';
-            deputyInfo.style.display = 'block';
+            document.getElementById('admin-panel').style.display = 'none';
+            document.getElementById('deputy-info').style.display = 'block';
         }
         initSocket(token);
         
@@ -137,23 +123,23 @@ function attemptLogin(token) {
 // ============================================================
 
 function restoreState(state) {
-    timerDisplay.textContent = `⏱️ ${state.time_remaining || 0}`;
+    document.getElementById('timer-display').textContent = `⏱️ ${state.time_remaining || 0}`;
     
     if (state.is_break) {
-        breakStatus.textContent = '⏸️ ПЕРЕРЫВ';
+        document.getElementById('break-status').textContent = '⏸️ ПЕРЕРЫВ';
     } else {
-        breakStatus.textContent = '';
+        document.getElementById('break-status').textContent = '';
     }
     
     if (state.is_voting) {
-        voteStatus.textContent = '🗳️ Идёт голосование';
+        document.getElementById('vote-status').textContent = '🗳️ Идёт голосование';
         if (!isAdmin && !hasVoted) {
             showVoteButtons();
         } else if (hasVoted) {
-            voteStatus.textContent = '🗳️ Вы уже проголосовали';
+            document.getElementById('vote-status').textContent = '🗳️ Вы уже проголосовали';
         }
     } else {
-        voteStatus.textContent = '';
+        document.getElementById('vote-status').textContent = '';
         hideVoteButtons();
     }
 }
@@ -175,8 +161,9 @@ function fetchDeputies() {
 }
 
 function renderDeputies(deputies) {
-    if (!deputiesList) return;
-    deputiesList.innerHTML = '';
+    const list = document.getElementById('deputies-list');
+    if (!list) return;
+    list.innerHTML = '';
     deputies.forEach(dep => {
         const li = document.createElement('li');
         li.innerHTML = `
@@ -184,7 +171,7 @@ function renderDeputies(deputies) {
             <span style="font-size:0.7rem;color:#8899bb;">${dep.token.substring(0, 12)}...</span>
             <div class="qr-code" id="qr-${dep.id}"></div>
         `;
-        deputiesList.appendChild(li);
+        list.appendChild(li);
         const phoneUrl = `${window.location.origin}/phone.html?token=${dep.token}`;
         if (typeof QRCode !== 'undefined') {
             try {
@@ -199,13 +186,14 @@ function renderDeputies(deputies) {
 }
 
 function populateSpeakerSelect(deputies) {
-    if (!speakerSelect) return;
-    speakerSelect.innerHTML = '';
+    const select = document.getElementById('speaker-select');
+    if (!select) return;
+    select.innerHTML = '';
     deputies.forEach(dep => {
         const opt = document.createElement('option');
         opt.value = dep.id;
         opt.textContent = dep.name;
-        speakerSelect.appendChild(opt);
+        select.appendChild(opt);
     });
 }
 
@@ -219,7 +207,7 @@ function showVoteButtons() {
         container = document.createElement('div');
         container.id = 'vote-buttons';
         container.className = 'vote-buttons';
-        if (deputyInfo) deputyInfo.appendChild(container);
+        document.getElementById('deputy-info').appendChild(container);
     }
     container.innerHTML = '';
     const choices = [
@@ -263,7 +251,7 @@ function sendVote(vote) {
         if (data.success) {
             hasVoted = true;
             hideVoteButtons();
-            voteStatus.textContent = '✅ Вы проголосовали!';
+            document.getElementById('vote-status').textContent = '✅ Вы проголосовали!';
         } else {
             alert('❌ ' + data.message);
             showVoteButtons();
@@ -276,23 +264,17 @@ function sendVote(vote) {
 }
 
 // ============================================================
-//  СОКЕТ — ИСПРАВЛЕННАЯ ВЕРСИЯ!
+//  СОКЕТ
 // ============================================================
 
 function initSocket(token) {
     if (socket) { socket.disconnect(); socket = null; }
     
-    socket = io(BACKEND_URL, {
-        transports: ['websocket', 'polling']
-    });
+    socket = io(BACKEND_URL);
     
     socket.on('connect', () => {
         console.log('✅ Сокет подключен');
-        // ТОКЕН ПЕРЕДАЁМ ТОЛЬКО В СОБЫТИИ join
-        socket.emit('join', { 
-            token: token,
-            peerId: null
-        });
+        socket.emit('join', { token: token, peerId: null });
     });
     
     socket.on('connect_error', (error) => {
@@ -304,27 +286,27 @@ function initSocket(token) {
     });
     
     socket.on('timer-update', (data) => {
-        timerDisplay.textContent = `⏱️ ${data.time}`;
+        document.getElementById('timer-display').textContent = `⏱️ ${data.time}`;
     });
     
     socket.on('floor-changed', (data) => {
         if (data.speakerId) {
-            timerDisplay.textContent = `⏱️ ${data.time || 0}`;
+            document.getElementById('timer-display').textContent = `⏱️ ${data.time || 0}`;
         }
     });
     
     socket.on('voting-started', () => {
-        voteStatus.textContent = '🗳️ Идёт голосование!';
+        document.getElementById('vote-status').textContent = '🗳️ Идёт голосование!';
         if (!isAdmin && !hasVoted) showVoteButtons();
     });
     
     socket.on('voting-closed', () => {
-        voteStatus.textContent = '🔒 Голосование закрыто';
+        document.getElementById('vote-status').textContent = '🔒 Голосование закрыто';
         hideVoteButtons();
     });
     
     socket.on('results', (data) => {
-        resultsDisplay.innerHTML = `
+        document.getElementById('results-display').innerHTML = `
             <strong>ЗА</strong> — ${data.for || 0} &nbsp;|&nbsp;
             <strong>ПРОТИВ</strong> — ${data.against || 0} &nbsp;|&nbsp;
             <strong>ВОЗДЕРЖАЛСЯ</strong> — ${data.abstain || 0}
@@ -332,11 +314,11 @@ function initSocket(token) {
     });
     
     socket.on('break-started', () => {
-        breakStatus.textContent = '⏸️ ПЕРЕРЫВ';
+        document.getElementById('break-status').textContent = '⏸️ ПЕРЕРЫВ';
     });
     
     socket.on('break-ended', () => {
-        breakStatus.textContent = '';
+        document.getElementById('break-status').textContent = '';
     });
     
     socket.on('deputies-updated', (deputies) => {
@@ -347,12 +329,12 @@ function initSocket(token) {
     });
     
     socket.on('clear-all', () => {
-        deputiesList.innerHTML = '';
-        speakerSelect.innerHTML = '';
-        resultsDisplay.innerHTML = '';
-        timerDisplay.textContent = '⏱️ 0';
-        voteStatus.textContent = '';
-        breakStatus.textContent = '';
+        document.getElementById('deputies-list').innerHTML = '';
+        document.getElementById('speaker-select').innerHTML = '';
+        document.getElementById('results-display').innerHTML = '';
+        document.getElementById('timer-display').textContent = '⏱️ 0';
+        document.getElementById('vote-status').textContent = '';
+        document.getElementById('break-status').textContent = '';
         hideVoteButtons();
         hasVoted = false;
         if (isAdmin) fetchDeputies();
@@ -398,7 +380,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------- КНОПКИ ----------
     
     document.getElementById('create-deputy-btn')?.addEventListener('click', () => {
-        const name = deputyNameInput.value.trim();
+        const name = document.getElementById('deputy-name').value.trim();
         if (!name) return alert('Введите имя');
         fetch(`${BACKEND_URL}/api/create-deputy`, {
             method: 'POST',
@@ -408,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                deputyNameInput.value = '';
+                document.getElementById('deputy-name').value = '';
                 fetchDeputies();
             } else {
                 alert(data.message);
@@ -418,9 +400,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     document.getElementById('give-floor-btn')?.addEventListener('click', () => {
-        const userId = speakerSelect.value;
+        const userId = document.getElementById('speaker-select').value;
         if (!userId) return alert('Выберите депутата');
-        let seconds = parseInt(customTime.value) || 60;
+        let seconds = parseInt(document.getElementById('custom-time').value) || 60;
         adminAction('give-floor', { userId, seconds });
     });
     
@@ -430,7 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            customTime.value = btn.dataset.seconds;
+            document.getElementById('custom-time').value = btn.dataset.seconds;
         });
     });
     
@@ -459,10 +441,6 @@ document.addEventListener('DOMContentLoaded', () => {
             adminAction('clear-all');
         }
     });
+    
+    document.getElementById('logout-btn')?.addEventListener('click', logout);
 });
-
-// ============================================================
-//  ВЫХОД
-// ============================================================
-
-document.getElementById('logout-btn')?.addEventListener('click', logout);
