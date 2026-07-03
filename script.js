@@ -470,10 +470,10 @@ function initSocket(token) {
         if (isAdmin) fetchDeputies();
     });
     
-    socket.on('error', (msg) => {
-        console.error('Ошибка сокета:', msg);
-        alert('Ошибка: ' + msg);
-    });
+    // socket.on('error', (msg) => {
+        // console.error('Ошибка сокета:', msg);
+        // alert('Ошибка: ' + msg);
+    // });
 }
 
 // ============================================================
